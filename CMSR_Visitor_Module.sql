@@ -158,18 +158,36 @@ where ID = (@id + 1 )
 set @time1 = GETDATE()
 
 -- Step 2: Delete only sessions that hit page spots as specified in the output 
+
+
 if LEN(@pages) > 1 
 	begin 
+	
+    declare @min_id bigint, @max_id bigint, @str varchar(1000) 
 
-	exec('delete
-	from #temp_subsession_level 
+    create table #data (minid bigint)
+
+    select @str = 'select top 1 navigation_id from spotlights_repl..vp_navigation where time_stamp between ''' + convert(varchar,@start_date) + ''' and ''' + convert(varchar,@start_date) + ' 00:02:00''' 
+    insert #data exec(@str)
+    select @min_id = minid from #data
+    select @str = 'select top 1 navigation_id from spotlights_repl..vp_navigation where time_stamp between ''' + convert(varchar,@end_date) + ''' and ''' + convert(varchar,@end_date) + ' 00:02:00''' 
+    insert #data exec(@str)
+    select @max_id = max(minid) from #data
+
+	set @str = ('delete
+	from #temp_subsession_level
 	where session_id not in
 	(
 	 select distinct t.session_id
-	 from #temp_subsession_level  t
+	 from #temp_subsession_level t
 	 join spotlights_repl..vp_navigation n
 	 on n.session_id = t.session_id
-	 and n.page_spot_id in ( ' +@pages + ' ))')
+	 and n.page_spot_id in ( ' +@pages + ' ) 
+	 and navigation_id between ' + convert(varchar,@min_id) + ' and ' + convert(varchar,@max_id) + ')')
+	 
+	exec(@str)
+	 
+	drop table #data 
 
 	end 	
 
